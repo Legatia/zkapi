@@ -42,6 +42,40 @@ private proof or key issuance requests.
 Never include note secrets, key values, proof bodies, or wallet transactions
 in host logs.
 
+## Sepolia shared password
+
+This stable SDK branch backports only shared-password support onto the deployed
+`cf56d67` SDK. Existing wallet recovery, token/daemon compatibility, public
+exports, deployment pins and proof artifacts are retained unchanged; adopting
+this auth update does not perform the later native-only SDK migration.
+
+A Sepolia server can require a shared testnet password. Pass
+`requestTestnetPassword: async ({ authenticate, signal }) => { ... }` to
+`configureBrowserSdk`. Show a password form and call
+`await authenticate(value, { signal: dialogAbortSignal })` on explicit submit.
+Keep the form open for a rejected password; resolve the callback only after
+validation succeeds. Reject on dismissal, and abort its validation request.
+Neither the callback nor the SDK should log or persist the password.
+
+Call `client.ensureTestnetAccess({ interactive: true, signal })` before the
+host's Send gate, including when reusing a live provider key. Deposit and
+access acquisition also enforce this inside the SDK. Read-only funding quotes
+fail with `testnet_password_required` until authenticated; they never open a
+dialog in background polling. Offer an explicit password action that calls
+`ensureTestnetAccess({ interactive: true, changePassword: true })`. The boolean
+`client.testnetAuthenticated` contains no credential. Reload clears access.
+
+Public `/health` must report the configured Sepolia `chain_id` and boolean
+`testnet_password_required`; missing or invalid discovery fails closed. The
+password is validated at `/v2/auth`, then attached only to the configured
+Sepolia protocol server's `/v2/` paths as `X-ZKAPI-Testnet-Password`. The host's
+trusted same-origin deployment rewrite and opt-in transport retain their
+normal roles. Transports must honor `redirect: 'error'` for these requests.
+Account cookies remain omitted. RPC, indexer, proof downloads, account
+endpoints and provider inference never receive this password. A 401 clears
+the rejected credential without replaying a protocol operation; recovery
+journals remain authoritative. Mainnet does no password discovery or prompting.
+
 This SDK requires `proof_setup.circuit_id: "zkapi-v2-note-bound-v1"` in the
 deployment manifest and matching `trusted_deployment.circuit_id` in the host
 config. Legacy unbound deployments are rejected before funding. This circuit
