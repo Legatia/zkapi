@@ -55,6 +55,8 @@ can be stopped with the corresponding service manager. Stop a foreground daemon
 before starting its service so they do not compete for the same wallet or port.
 Package installation does not fund or initialize a wallet. An unconfigured
 service either remains stopped (Nix modules) or exits with configuration guidance.
+A configured service starts even before the wallet is funded; fund it with
+`zkapi-clientd config` or [`zkapi-clientd fund`](CLI_ZKAPI.md#scripted-funding-and-withdrawal).
 
 The AUR handoff and Homebrew formula are ready to copy into their respective
 package repositories; adding them here does not publish an AUR entry or a public
