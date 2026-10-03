@@ -130,6 +130,46 @@ func TestFundAmountOnlyQuotesExactDeposit(t *testing.T) {
 	}
 }
 
+func TestFundJSONPrintsOnlyTheQuoteOnStandardOutput(t *testing.T) {
+	s := fundingCLITestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "POST" {
+			if r.URL.Path != "/admin/funding/quote" {
+				t.Errorf("quoting authorized a transaction: %s", r.URL.Path)
+			}
+			q := paymentTestQuote("deposit")
+			q.InputMicroUSD = 5_000_000
+			_ = json.NewEncoder(w).Encode(q)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(fundingTestStatus("ready"))
+	}))
+	defer s.Close()
+	var out, status bytes.Buffer
+	previous := walletStatusOutput
+	walletStatusOutput = &status
+	defer func() { walletStatusOutput = previous }()
+	if err := runFunding(context.Background(), fundingTestConfig(s), []string{"--usd", "5", "--json"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	var quote zkapi.AddressPaymentQuote
+	decoder := json.NewDecoder(&out)
+	if err := decoder.Decode(&quote); err != nil || quote.ID != testQuoteID || quote.Kind != "deposit" || quote.InputMicroUSD != 5_000_000 || decoder.More() {
+		t.Fatalf("standard output is not exactly one quote: %+v, %v", quote, err)
+	}
+	if !strings.Contains(status.String(), "--approve "+testQuoteID) || !strings.Contains(status.String(), "Quoting does not sign") {
+		t.Fatalf("status text missing: %s", status.String())
+	}
+}
+
+func TestFundJSONOnlyAppliesToQuotes(t *testing.T) {
+	c := config.Config{Backend: "zkapi", Listen: "127.0.0.1:1"}
+	for _, args := range [][]string{{"--json"}, {"--json", "--resume"}, {"--json", "--approve", testQuoteID}} {
+		if err := runFunding(context.Background(), c, args, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "--json applies only") {
+			t.Fatalf("%v: %v", args, err)
+		}
+	}
+}
+
 func TestFundDisplaysSavedAmountForResumption(t *testing.T) {
 	s := fundingCLITestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" {

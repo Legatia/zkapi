@@ -107,6 +107,44 @@ func TestWithdrawDestinationOnlyPreparesBoundQuote(t *testing.T) {
 	}
 }
 
+func TestWithdrawJSONPrintsOnlyTheQuoteOnStandardOutput(t *testing.T) {
+	s := fundingCLITestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			if r.URL.Path != "/admin/withdrawal/quote" {
+				t.Errorf("quoting authorized a transaction: %s", r.URL.Path)
+			}
+			_ = json.NewEncoder(w).Encode(paymentTestQuote("withdrawal"))
+			return
+		}
+		_ = json.NewEncoder(w).Encode(withdrawalTestStatus("ready"))
+	}))
+	defer s.Close()
+	var out, status bytes.Buffer
+	previous := walletStatusOutput
+	walletStatusOutput = &status
+	defer func() { walletStatusOutput = previous }()
+	if err := runWithdrawal(context.Background(), withdrawalTestConfig(s), []string{"--to", withdrawalTestDestination, "--json"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	var quote zkapi.AddressPaymentQuote
+	decoder := json.NewDecoder(&out)
+	if err := decoder.Decode(&quote); err != nil || quote.ID != testQuoteID || quote.Kind != "withdrawal" || quote.NoteID != 58 || !strings.EqualFold(quote.Destination, withdrawalTestDestination) || decoder.More() {
+		t.Fatalf("standard output is not exactly one quote: %+v, %v", quote, err)
+	}
+	if !strings.Contains(status.String(), "--approve "+testQuoteID) {
+		t.Fatalf("status text missing: %s", status.String())
+	}
+}
+
+func TestWithdrawJSONOnlyAppliesToQuotes(t *testing.T) {
+	c := config.Config{Backend: "zkapi", Listen: "127.0.0.1:1"}
+	for _, args := range [][]string{{"--json"}, {"--json", "--resume"}, {"--json", "--approve", testQuoteID}, {"--json", "--to", withdrawalTestDestination, "--confirm", "0x" + strings.Repeat("1", 64)}} {
+		if err := runWithdrawal(context.Background(), c, args, &bytes.Buffer{}); err == nil || strings.Contains(err.Error(), "unavailable") {
+			t.Fatalf("%v reached the daemon: %v", args, err)
+		}
+	}
+}
+
 func TestWithdrawSavedDestinationCannotChange(t *testing.T) {
 	for _, phase := range []string{"waiting_settlement", "waiting_funds", "withdrawal_pending", "confirming", "reverted"} {
 		t.Run(phase, func(t *testing.T) {

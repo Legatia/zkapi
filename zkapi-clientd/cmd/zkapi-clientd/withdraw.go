@@ -35,6 +35,11 @@ func runWithdrawal(ctx context.Context, c config.Config, args []string, out io.W
 	confirmationText := flags.String("confirm", "", "confirm an independently submitted matching withdrawal after a finalized local revert")
 	approval := flags.String("approve", "", "approve the displayed withdrawal quote ID")
 	resume := flags.Bool("resume", false, "recover a saved signed withdrawal without authorizing a new transaction")
+	jsonOutput := flags.Bool("json", false, "with --to, print a newly prepared quote as JSON on standard output and status text on standard error")
+	flags.Usage = func() {
+		fmt.Fprintln(flags.Output(), "Usage: zkapi-clientd withdraw [--to ADDRESS [--json] | --approve QUOTE_ID | --resume]\nWithout options, show the private balance and saved progress. Requires a running daemon.\nA quote never signs; --approve signs only that exact unexpired quote.")
+		flags.PrintDefaults()
+	}
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -61,6 +66,13 @@ func runWithdrawal(ctx context.Context, c config.Config, args []string, out io.W
 	})
 	if confirmationSet && (!destinationSet || !validWithdrawalTransactionHash(*confirmationText)) {
 		return errors.New("--confirm requires --to and a valid 32-byte transaction hash")
+	}
+	if *jsonOutput && (!destinationSet || confirmationSet) {
+		return errors.New("--json applies only to --to quotes")
+	}
+	quoteOut := out
+	if *jsonOutput {
+		out = walletStatusOutput
 	}
 	destination := ""
 	var err error
@@ -174,6 +186,9 @@ func runWithdrawal(ctx context.Context, c config.Config, args []string, out io.W
 				return errors.New("withdrawal quote changed the selected note or destination")
 			}
 			printPaymentQuote(out, quote, "zkapi-clientd withdraw")
+			if *jsonOutput {
+				return json.NewEncoder(quoteOut).Encode(quote)
+			}
 			return nil
 		}
 	}

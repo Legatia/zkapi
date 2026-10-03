@@ -64,8 +64,10 @@ func run(args []string) error {
 		help()
 		return nil
 	}
-	if args[0] != "config" && args[0] != "serve" {
-		return errors.New("unknown command; use zkapi-clientd config or zkapi-clientd serve (--help for usage)")
+	switch args[0] {
+	case "config", "serve", "fund", "withdraw":
+	default:
+		return errors.New("unknown command; use zkapi-clientd config, serve, fund, or withdraw (--help for usage)")
 	}
 	if dir == "" {
 		dir, err = config.DefaultDir()
@@ -83,6 +85,9 @@ func run(args []string) error {
 		ui := &terminalSetupPrompter{out: os.Stdout}
 		defer ui.Close()
 		return runConfigure(ctx, dir, args[1:], ui, os.Stdout)
+	}
+	if args[0] == "fund" || args[0] == "withdraw" {
+		return runWalletCommand(dir, args[0], args[1:], os.Stdout)
 	}
 	if args[0] == "serve" && len(args) == 2 && (args[1] == "--help" || args[1] == "-h") {
 		fmt.Println("Usage: zkapi-clientd serve\nRun the saved configuration. Run zkapi-clientd config to configure missing prerequisites.")
@@ -103,13 +108,46 @@ func run(args []string) error {
 
 }
 
+// Wallet commands are clients of the running daemon's authenticated admin API.
+// Quoting never signs; only --approve with the exact displayed quote ID spends.
+func runWalletCommand(dir, command string, args []string, out io.Writer) error {
+	c, err := config.Load(dir)
+	if err != nil && !helpRequested(args) {
+		return configurationRequired(err)
+	}
+	// Help needs no configuration: flag parsing returns before any request.
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	if command == "fund" {
+		err = runFunding(ctx, c, args, out)
+	} else {
+		err = runWithdrawal(ctx, c, args, out)
+	}
+	if errors.Is(err, flag.ErrHelp) {
+		return nil
+	}
+	return err
+}
+
+func helpRequested(args []string) bool {
+	for _, arg := range args {
+		if arg == "-h" || arg == "-help" || arg == "--help" {
+			return true
+		}
+	}
+	return false
+}
+
 func help() {
 	fmt.Fprintln(os.Stderr, `Usage: zkapi-clientd [--config-dir DIR] COMMAND
 
   config                 Show status, configure or edit settings, and prepare the wallet
   serve                  Run inference using the saved configuration
+  fund                   Quote, approve, or resume a deposit through the running daemon
+  withdraw               Quote, approve, or resume a withdrawal through the running daemon
 
 Run zkapi-clientd config --help for configuration options.
+Run zkapi-clientd fund --help or zkapi-clientd withdraw --help for wallet options.
 Run zkapi-clientd --version to show the installed version.
 Config: ZKAPI_CLIENTD_CONFIG_DIR or the OS user config directory / zkapi-clientd.
 Mainnet is the default; Sepolia keeps a separate wallet.
@@ -183,7 +221,7 @@ func (z zkInference) Complete(ctx context.Context, body json.RawMessage) (*http.
 		}
 		switch remote.Status {
 		case http.StatusPaymentRequired:
-			return nil, &server.BackendError{Status: 402, Code: "funding_required", Message: "The private balance needs funding. Run zkapi-clientd config to add funding."}
+			return nil, &server.BackendError{Status: 402, Code: "funding_required", Message: "The private balance needs funding. Run zkapi-clientd config or zkapi-clientd fund to add funding."}
 		case http.StatusConflict:
 			if remote.Code == "withdrawal_pending" || remote.Code == "withdrawal_conflict" {
 				return nil, &server.BackendError{Status: 409, Code: "withdrawal_pending", Message: "The private balance is reserved for withdrawal. Run zkapi-clientd config --menu and choose withdraw to recover the saved destination."}

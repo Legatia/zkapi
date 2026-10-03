@@ -51,6 +51,10 @@ func runPublicReturn(ctx context.Context, c config.Config, args []string, out io
 	amountText := flags.String("amount", "", "exact ETH amount (up to 18 decimals); omit to sweep an EOA after reserving fees")
 	approve := flags.String("approve", "", "approve the displayed return quote ID")
 	resume := flags.Bool("resume", false, "recover the saved signed public return")
+	flags.Usage = func() {
+		fmt.Fprintln(flags.Output(), "Usage: zkapi-clientd fund return [--to ADDRESS [--amount ETH] | --approve QUOTE_ID | --resume]\nReturn public ETH from the local signing address. Requires a running daemon.")
+		flags.PrintDefaults()
+	}
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
