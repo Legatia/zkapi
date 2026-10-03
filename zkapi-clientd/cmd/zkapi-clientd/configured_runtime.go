@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -31,12 +32,13 @@ func configuredRuntime(expected config.Config) startRuntime {
 }
 
 // Serve never reads the terminal or authorizes funding.
-// It uses the same authenticated startup checks as config, then stays running.
+// It uses the same authenticated startup checks as config, then stays running,
+// including while the wallet still needs funding or a withdrawal to finish.
 func runConfiguredServe(ctx context.Context, dir string, c, expected config.Config, out io.Writer) error {
 	ui := &noninteractiveSetup{out: out}
 	runtime := configuredRuntime(expected)
 	runtime.testnet = checkSepoliaAccess
-	runtime.fund = checkConfiguredZKAPI
+	runtime.fund = checkServeZKAPI
 	err := guidedStart(ctx, dir, startOptions{prepared: &c, checkOnly: true}, ui, out, runtime)
 	if ctx.Err() != nil {
 		return nil
@@ -70,6 +72,14 @@ func (w setupUIWriter) Write(p []byte) (int, error) {
 }
 
 func checkConfiguredZKAPI(ctx context.Context, c config.Config, _, _ string, ui setupPrompter) error {
+	return checkZKAPIWallet(ctx, c, ui, configuredWalletReady)
+}
+
+func checkServeZKAPI(ctx context.Context, c config.Config, _, _ string, ui setupPrompter) error {
+	return checkZKAPIWallet(ctx, c, ui, serveWalletReady)
+}
+
+func checkZKAPIWallet(ctx context.Context, c config.Config, ui setupPrompter, ready func(context.Context, guidedFundingService, setupPrompter) error) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	client, err := relay.NewClient(c.RelayURL)
@@ -81,7 +91,7 @@ func checkConfiguredZKAPI(ctx context.Context, c config.Config, _, _ string, ui 
 	if err != nil {
 		return err
 	}
-	return configuredWalletReady(ctx, localGuidedFunding{c, wallet}, ui)
+	return ready(ctx, localGuidedFunding{c, wallet}, ui)
 }
 
 // Deliberately does not call Address, Quote, Approve, Resume, or Withdrawal:
@@ -102,6 +112,32 @@ func configuredWalletReady(ctx context.Context, service guidedFundingService, ui
 		return nil
 	}
 	return checkSetupBalance(state, ui)
+}
+
+// Serve keeps the local API running when the wallet cannot spend yet, so a
+// service can start before the first deposit and the fund and withdraw
+// commands can reach it without a terminal. Inference returns funding_required
+// or withdrawal_pending until the wallet is ready. Like configuredWalletReady,
+// it never prepares or authorizes a wallet operation. Companion or wallet
+// status errors still stop startup.
+func serveWalletReady(ctx context.Context, service guidedFundingService, ui setupPrompter) error {
+	state, err := service.Readiness(ctx)
+	if err != nil {
+		return err
+	}
+	switch {
+	case state.WithdrawalPending:
+		ui.Printf("Warning: a private withdrawal is reserved; inference is unavailable until it completes. Run zkapi-clientd withdraw to show its saved progress and recovery command.\n")
+	case !state.HasNote:
+		ui.Printf("Warning: the zkAPI wallet has no private balance; inference returns funding_required until a deposit is active. While serve runs, add funding with zkapi-clientd fund or zkapi-clientd config.\n")
+	case state.PendingRequest:
+		ui.Printf("A previous inference is settling; new requests will wait automatically.\n")
+	case state.Balance == 0:
+		ui.Printf("Warning: the private balance is empty; inference returns funding_required. Close this note with zkapi-clientd withdraw --to ADDRESS before adding funding.\n")
+	default:
+		ui.Printf("Private balance: %s ETH.\n", fundingUnits(strconv.FormatUint(state.Balance, 10), 9))
+	}
+	return nil
 }
 
 // Config owns a temporary runtime only for the selected wallet operation. It

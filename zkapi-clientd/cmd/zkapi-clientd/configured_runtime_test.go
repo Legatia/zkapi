@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -53,6 +54,50 @@ func TestServeReadinessDoesNotAuthorizeOrPrepareWalletOperations(t *testing.T) {
 				t.Fatal("serve attempted interactive setup or a wallet mutation")
 			}
 		})
+	}
+}
+
+func TestServeStaysUpUntilWalletCanSpend(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		state   zkapi.WalletReadiness
+		message string
+	}{
+		{"unfunded", zkapi.WalletReadiness{}, "Warning: the zkAPI wallet has no private balance; inference returns funding_required"},
+		{"empty balance", zkapi.WalletReadiness{HasNote: true}, "Warning: the private balance is empty"},
+		{"withdrawal", zkapi.WalletReadiness{HasNote: true, WithdrawalPending: true, Balance: 999999}, "Warning: a private withdrawal is reserved"},
+		{"settlement with withdrawal", zkapi.WalletReadiness{HasNote: true, PendingRequest: true, WithdrawalPending: true}, "Warning: a private withdrawal is reserved"},
+		{"settlement", zkapi.WalletReadiness{HasNote: true, PendingRequest: true}, "previous inference is settling"},
+		{"ready", zkapi.WalletReadiness{HasNote: true, Balance: 999999}, "Private balance: 0.000999999 ETH."},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fixture := newWizardFixture()
+			fixture.ready = func(int) zkapi.WalletReadiness { return test.state }
+			var out bytes.Buffer
+			ui := &noninteractiveSetup{out: &out}
+			if err := serveWalletReady(context.Background(), readOnlyFundingFixture{fixture}, ui); err != nil {
+				t.Fatalf("serve stopped: %v", err)
+			}
+			if !strings.Contains(out.String(), test.message) {
+				t.Fatalf("missing %q in %s", test.message, out.String())
+			}
+			if fixture.quoteCalls != 0 || fixture.approveCalls != 0 || fixture.resumeCalls != 0 {
+				t.Fatal("serve attempted a wallet mutation")
+			}
+		})
+	}
+}
+
+type failingReadinessFixture struct{ readOnlyFundingFixture }
+
+func (failingReadinessFixture) Readiness(context.Context) (zkapi.WalletReadiness, error) {
+	return zkapi.WalletReadiness{}, errors.New("companion unavailable")
+}
+
+func TestServeStillStopsWhenWalletStatusFails(t *testing.T) {
+	fixture := failingReadinessFixture{readOnlyFundingFixture{newWizardFixture()}}
+	if err := serveWalletReady(context.Background(), fixture, &noninteractiveSetup{out: io.Discard}); err == nil {
+		t.Fatal("serve ignored a wallet status failure")
 	}
 }
 
