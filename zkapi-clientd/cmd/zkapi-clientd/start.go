@@ -480,7 +480,8 @@ func guidedStart(ctx context.Context, dir string, options startOptions, ui setup
 	readyCancel()
 	clearSetupProgress(ui)
 	err = runtime.fund(life, c, options.usd, options.model, ui)
-	if err != nil {
+	waiting := errors.Is(err, errWalletNotReady)
+	if err != nil && !waiting {
 		return err
 	}
 	if err := life.Err(); err != nil {
@@ -489,7 +490,11 @@ func guidedStart(ctx context.Context, dir string, options startOptions, ui setup
 	if options.setupOnly {
 		return nil
 	}
-	ui.Printf("\nReady for inference.\n")
+	if waiting {
+		ui.Printf("\nLocal API running; inference is unavailable until the wallet can spend.\n")
+	} else {
+		ui.Printf("\nReady for inference.\n")
+	}
 	showClientConnection(c, ui)
 	showCustomProfileHint(dir, ui)
 	if attached {

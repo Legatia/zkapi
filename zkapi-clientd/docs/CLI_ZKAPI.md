@@ -66,19 +66,21 @@ to `config`. Configuration stops temporary services it starts; an existing
 compatible service it reused remains running. Stop a running service before
 editing its configuration.
 
-`serve` also starts when the wallet cannot spend yet: before the first deposit,
-with an empty private balance, or while a withdrawal is reserved. It logs a
-warning and keeps running. Inference returns `402 funding_required` (or
-`409 withdrawal_pending`) until the wallet is ready, and a deposit made through
-the running daemon takes effect without a restart. Companion and wallet status
-errors still stop `serve`.
+By default `serve` exits when the wallet cannot spend: before the first
+deposit, with an empty private balance, or while a withdrawal is reserved.
+`serve --allow-unfunded` logs a warning instead and keeps running, without
+reporting itself ready for inference. Inference returns `402 funding_required`
+(or `409 withdrawal_pending`) until the wallet can spend, and a deposit made
+through the running daemon takes effect without a restart. Companion and wallet
+status errors still stop `serve`.
 
 ## Scripted funding and withdrawal
 
 On a host without a terminal, `zkapi-clientd config --network mainnet` creates
 the profile, then stops with an error at the first wallet question without
-spending anything. Start `serve` (for example as a service) and fund the wallet
-with `fund`.
+spending anything. Start `serve --allow-unfunded` (for example as a service,
+see [background services](CLI_PACKAGING.md#platform-packages-and-background-services))
+and fund the wallet with `fund`.
 
 `fund` and `withdraw` never read the terminal. They act through the running
 daemon (`serve`, a background service, or a temporary `config` daemon) and its

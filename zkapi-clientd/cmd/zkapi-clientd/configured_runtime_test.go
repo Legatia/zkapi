@@ -57,26 +57,28 @@ func TestServeReadinessDoesNotAuthorizeOrPrepareWalletOperations(t *testing.T) {
 	}
 }
 
-func TestServeStaysUpUntilWalletCanSpend(t *testing.T) {
+func TestUnfundedServeWarnsWithoutWalletOperations(t *testing.T) {
 	for _, test := range []struct {
 		name    string
 		state   zkapi.WalletReadiness
+		ready   bool
 		message string
 	}{
-		{"unfunded", zkapi.WalletReadiness{}, "Warning: the zkAPI wallet has no private balance; inference returns funding_required"},
-		{"empty balance", zkapi.WalletReadiness{HasNote: true}, "Warning: the private balance is empty"},
-		{"withdrawal", zkapi.WalletReadiness{HasNote: true, WithdrawalPending: true, Balance: 999999}, "Warning: a private withdrawal is reserved"},
-		{"settlement with withdrawal", zkapi.WalletReadiness{HasNote: true, PendingRequest: true, WithdrawalPending: true}, "Warning: a private withdrawal is reserved"},
-		{"settlement", zkapi.WalletReadiness{HasNote: true, PendingRequest: true}, "previous inference is settling"},
-		{"ready", zkapi.WalletReadiness{HasNote: true, Balance: 999999}, "Private balance: 0.000999999 ETH."},
+		{"unfunded", zkapi.WalletReadiness{}, false, "Warning: the zkAPI wallet has no private balance; inference returns funding_required"},
+		{"empty balance", zkapi.WalletReadiness{HasNote: true}, false, "Warning: the private balance is empty"},
+		{"withdrawal", zkapi.WalletReadiness{HasNote: true, WithdrawalPending: true, Balance: 999999}, false, "Warning: a private withdrawal is reserved"},
+		{"settlement with withdrawal", zkapi.WalletReadiness{HasNote: true, PendingRequest: true, WithdrawalPending: true}, false, "Warning: a private withdrawal is reserved"},
+		{"settlement", zkapi.WalletReadiness{HasNote: true, PendingRequest: true}, true, "previous inference is settling"},
+		{"ready", zkapi.WalletReadiness{HasNote: true, Balance: 999999}, true, "Private balance: 0.000999999 ETH."},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			fixture := newWizardFixture()
 			fixture.ready = func(int) zkapi.WalletReadiness { return test.state }
 			var out bytes.Buffer
 			ui := &noninteractiveSetup{out: &out}
-			if err := serveWalletReady(context.Background(), readOnlyFundingFixture{fixture}, ui); err != nil {
-				t.Fatalf("serve stopped: %v", err)
+			err := serveWalletReady(context.Background(), readOnlyFundingFixture{fixture}, ui)
+			if test.ready && err != nil || !test.ready && !errors.Is(err, errWalletNotReady) {
+				t.Fatalf("readiness = %v", err)
 			}
 			if !strings.Contains(out.String(), test.message) {
 				t.Fatalf("missing %q in %s", test.message, out.String())
@@ -96,7 +98,7 @@ func (failingReadinessFixture) Readiness(context.Context) (zkapi.WalletReadiness
 
 func TestServeStillStopsWhenWalletStatusFails(t *testing.T) {
 	fixture := failingReadinessFixture{readOnlyFundingFixture{newWizardFixture()}}
-	if err := serveWalletReady(context.Background(), fixture, &noninteractiveSetup{out: io.Discard}); err == nil {
+	if err := serveWalletReady(context.Background(), fixture, &noninteractiveSetup{out: io.Discard}); err == nil || errors.Is(err, errWalletNotReady) {
 		t.Fatal("serve ignored a wallet status failure")
 	}
 }

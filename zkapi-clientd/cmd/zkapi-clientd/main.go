@@ -90,7 +90,7 @@ func run(args []string) error {
 		return runWalletCommand(dir, args[0], args[1:], os.Stdout)
 	}
 	if args[0] == "serve" && len(args) == 2 && (args[1] == "--help" || args[1] == "-h") {
-		fmt.Println("Usage: zkapi-clientd serve\nRun the saved configuration. Run zkapi-clientd config to configure missing prerequisites.")
+		fmt.Println("Usage: zkapi-clientd serve [--allow-unfunded]\nRun the saved configuration. Run zkapi-clientd config to configure missing prerequisites.\n  --allow-unfunded  keep running while the wallet cannot spend (no deposit, empty balance, or reserved withdrawal);\n                    inference returns funding_required or withdrawal_pending until it can")
 		return nil
 	}
 	c, err := config.Load(dir)
@@ -100,11 +100,11 @@ func run(args []string) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	expected := c
-	c, err = serveConfig(c, args[1:])
+	c, allowUnfunded, err := serveConfig(c, args[1:])
 	if err != nil {
 		return err
 	}
-	return runConfiguredServe(ctx, dir, c, expected, os.Stdout)
+	return runConfiguredServe(ctx, dir, c, expected, os.Stdout, allowUnfunded)
 
 }
 
@@ -143,6 +143,7 @@ func help() {
 
   config                 Show status, configure or edit settings, and prepare the wallet
   serve                  Run inference using the saved configuration
+                         (--allow-unfunded keeps it running until the wallet can spend)
   fund                   Quote, approve, or resume a deposit through the running daemon
   withdraw               Quote, approve, or resume a withdrawal through the running daemon
 
@@ -185,18 +186,19 @@ func initialize(dir string, args []string) error {
 }
 
 // Serving uses the saved network without rewriting wallet state.
-func serveConfig(c config.Config, args []string) (config.Config, error) {
+func serveConfig(c config.Config, args []string) (config.Config, bool, error) {
 	f := flag.NewFlagSet("serve", flag.ContinueOnError)
+	allowUnfunded := f.Bool("allow-unfunded", false, "keep running while the wallet cannot spend; inference returns funding_required until it can")
 	if err := f.Parse(args); err != nil {
-		return config.Config{}, err
+		return config.Config{}, false, err
 	}
 	if f.NArg() != 0 {
-		return config.Config{}, errors.New("serve accepts no arguments; use zkapi-clientd config to change settings")
+		return config.Config{}, false, errors.New("serve accepts no arguments; use zkapi-clientd config to change settings")
 	}
 	if err := config.Validate(c); err != nil {
-		return config.Config{}, err
+		return config.Config{}, false, err
 	}
-	return c, nil
+	return c, *allowUnfunded, nil
 }
 
 func zkConfig(c config.Config, client *http.Client) zkapi.Config {
