@@ -145,6 +145,30 @@ func TestWithdrawJSONOnlyAppliesToQuotes(t *testing.T) {
 	}
 }
 
+func TestWithdrawJSONFailsWithoutANewQuote(t *testing.T) {
+	for _, phase := range []string{"withdrawal_pending", "confirming", "complete"} {
+		t.Run(phase, func(t *testing.T) {
+			s := fundingCLITestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Errorf("--json without a quote submitted %s", r.URL.Path)
+				}
+				state := withdrawalTestStatus(phase)
+				state["transaction_hash"] = "0x" + strings.Repeat("a", 64)
+				_ = json.NewEncoder(w).Encode(state)
+			}))
+			defer s.Close()
+			var out bytes.Buffer
+			previous := walletStatusOutput
+			walletStatusOutput = io.Discard
+			defer func() { walletStatusOutput = previous }()
+			err := runWithdrawal(context.Background(), withdrawalTestConfig(s), []string{"--to", withdrawalTestDestination, "--json"}, &out)
+			if err == nil || !strings.Contains(err.Error(), "no quote prepared") || out.Len() != 0 {
+				t.Fatalf("stdout %q, error %v", out.String(), err)
+			}
+		})
+	}
+}
+
 func TestWithdrawSavedDestinationCannotChange(t *testing.T) {
 	for _, phase := range []string{"waiting_settlement", "waiting_funds", "withdrawal_pending", "confirming", "reverted"} {
 		t.Run(phase, func(t *testing.T) {

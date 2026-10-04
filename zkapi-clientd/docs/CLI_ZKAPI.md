@@ -104,14 +104,18 @@ on failure.
 
 Add `--json` to a quote to print the validated quote as one JSON object on
 standard output, with status text on standard error. Scripts can then read
-`id`, `amount`, `shortfall_wei` and the fee fields without parsing text.
+`id`, `amount`, `shortfall_wei`, `expires_at` (Unix milliseconds) and the fee
+fields without parsing text. If no new quote is prepared, for example because
+a signed withdrawal is already saved, the command exits nonzero and prints
+nothing on standard output.
 
 The wallet holds one note, and a note cannot be topped up. To add funds after
 a deposit, withdraw the note (for example to an address you control), then fund
 a new one. A withdrawal cannot be quoted while an inference key is still
 settling. Settlement starts when the key reuse window ends (60 seconds by
-default), so retry `withdraw --to` after that. `fund return --to ADDRESS` sends public ETH left on the local signing
-address, with the same quote and `--approve` steps.
+default), so retry `withdraw --to` after that. `fund return --to ADDRESS`
+sends public ETH left on the local signing address, with the same quote and
+`--approve` steps.
 
 ```sh
 # Show the local signing address. Send it ETH for the deposit plus network fees.
