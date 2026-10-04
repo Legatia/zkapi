@@ -29,7 +29,7 @@ func runFunding(ctx context.Context, c config.Config, args []string, out io.Writ
 	submitted := false
 	defer func() {
 		if result != nil && submitted {
-			result = fmt.Errorf("%w; recover saved progress with zkapi-clientd config and use the same --config-dir", result)
+			result = fmt.Errorf("%w; recover saved progress with zkapi-clientd fund --resume or zkapi-clientd config, and use the same --config-dir", result)
 		}
 	}()
 	if len(args) > 0 && args[0] == "return" {

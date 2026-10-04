@@ -224,7 +224,7 @@ func (z zkInference) Complete(ctx context.Context, body json.RawMessage) (*http.
 			return nil, &server.BackendError{Status: 402, Code: "funding_required", Message: "The private balance needs funding. Run zkapi-clientd config or zkapi-clientd fund to add funding."}
 		case http.StatusConflict:
 			if remote.Code == "withdrawal_pending" || remote.Code == "withdrawal_conflict" {
-				return nil, &server.BackendError{Status: 409, Code: "withdrawal_pending", Message: "The private balance is reserved for withdrawal. Run zkapi-clientd config --menu and choose withdraw to recover the saved destination."}
+				return nil, &server.BackendError{Status: 409, Code: "withdrawal_pending", Message: "The private balance is reserved for withdrawal. Run zkapi-clientd withdraw, or zkapi-clientd config --menu and choose withdraw, to recover the saved destination."}
 			}
 			return nil, &server.BackendError{Status: 409, Code: "wallet_conflict", Message: "The wallet could not safely prepare fresh anonymous access. Run zkapi-clientd config to check its state."}
 		}

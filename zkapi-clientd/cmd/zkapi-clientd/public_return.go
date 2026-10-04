@@ -43,7 +43,7 @@ func runPublicReturn(ctx context.Context, c config.Config, args []string, out io
 	submitted := false
 	defer func() {
 		if result != nil && submitted {
-			result = fmt.Errorf("%w; recover saved progress with zkapi-clientd config --menu, choose return, and use the same --config-dir", result)
+			result = fmt.Errorf("%w; recover saved progress with zkapi-clientd fund return --resume or zkapi-clientd config --menu (choose return), and use the same --config-dir", result)
 		}
 	}()
 	flags := flag.NewFlagSet("fund return", flag.ContinueOnError)
