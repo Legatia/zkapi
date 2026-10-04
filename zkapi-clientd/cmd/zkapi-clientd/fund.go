@@ -42,7 +42,7 @@ func runFunding(ctx context.Context, c config.Config, args []string, out io.Writ
 	resume := flags.Bool("resume", false, "recover the saved signed deposit without authorizing a new transaction")
 	jsonOutput := flags.Bool("json", false, "with --amount or --usd, print the validated quote as JSON on standard output and status text on standard error")
 	flags.Usage = func() {
-		fmt.Fprintln(flags.Output(), "Usage: zkapi-clientd fund [--usd N [--json] | --amount ETH [--json] | --approve QUOTE_ID | --resume]\n       zkapi-clientd fund return [--to ADDRESS [--amount ETH] | --approve QUOTE_ID | --resume]\nWithout options, show the funding address and saved progress. Requires a running daemon.\nA quote never signs; --approve signs only that exact unexpired quote.")
+		fmt.Fprintln(flags.Output(), "Usage: zkapi-clientd fund [--usd N [--json] | --amount ETH [--json] | --approve QUOTE_ID | --resume]\n       zkapi-clientd fund return [--to ADDRESS [--amount ETH] [--json] | --approve QUOTE_ID | --resume]\nWithout options, show the funding address and saved progress. Requires a running daemon.\nA quote never signs; --approve signs only that exact unexpired quote.")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -124,7 +124,7 @@ func runFunding(ctx context.Context, c config.Config, args []string, out io.Writ
 		}
 		printPaymentQuote(out, quote, "zkapi-clientd fund")
 		if *jsonOutput {
-			return json.NewEncoder(quoteOut).Encode(quote)
+			return writeScriptQuote(quoteOut, quote)
 		}
 		return nil
 	}

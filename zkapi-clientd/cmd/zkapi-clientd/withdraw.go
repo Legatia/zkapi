@@ -193,7 +193,7 @@ func runWithdrawal(ctx context.Context, c config.Config, args []string, out io.W
 			}
 			printPaymentQuote(out, quote, "zkapi-clientd withdraw")
 			if *jsonOutput {
-				return json.NewEncoder(quoteOut).Encode(quote)
+				return writeScriptQuote(quoteOut, quote)
 			}
 			return nil
 		}

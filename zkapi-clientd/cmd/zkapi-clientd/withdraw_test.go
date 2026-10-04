@@ -126,10 +126,9 @@ func TestWithdrawJSONPrintsOnlyTheQuoteOnStandardOutput(t *testing.T) {
 	if err := runWithdrawal(context.Background(), withdrawalTestConfig(s), []string{"--to", withdrawalTestDestination, "--json"}, &out); err != nil {
 		t.Fatal(err)
 	}
-	var quote zkapi.AddressPaymentQuote
-	decoder := json.NewDecoder(&out)
-	if err := decoder.Decode(&quote); err != nil || quote.ID != testQuoteID || quote.Kind != "withdrawal" || quote.NoteID != 58 || !strings.EqualFold(quote.Destination, withdrawalTestDestination) || decoder.More() {
-		t.Fatalf("standard output is not exactly one quote: %+v, %v", quote, err)
+	quote := decodeScriptQuote(t, &out, "id", "kind", "network", "address", "destination", "amount_wei", "max_fee_wei", "required_total_wei", "shortfall_wei", "expires_at")
+	if quote["id"] != testQuoteID || quote["kind"] != "withdraw" || quote["amount_wei"] != "99971000000000" || !strings.EqualFold(quote["destination"].(string), withdrawalTestDestination) {
+		t.Fatalf("unexpected quote: %v", quote)
 	}
 	if !strings.Contains(status.String(), "--approve "+testQuoteID) {
 		t.Fatalf("status text missing: %s", status.String())

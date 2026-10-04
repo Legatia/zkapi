@@ -91,7 +91,8 @@ with the admin API; keep it private.
 
 Every payment takes two steps:
 
-1. A quote (`fund --usd N`, `fund --amount ETH` or `withdraw --to ADDRESS`)
+1. A quote (`fund --usd N`, `fund --amount ETH`, `withdraw --to ADDRESS` or
+   `fund return --to ADDRESS`)
    shows the fixed amount, destination, local signing address and maximum
    network fee. It signs nothing.
 2. `--approve QUOTE_ID` signs and broadcasts only that exact quote, if it is
@@ -104,12 +105,23 @@ transaction and never authorizes another. Without options, each command shows
 the address, balances and saved progress. Commands exit with a nonzero status
 on failure.
 
-Add `--json` to a quote to print the validated quote as one JSON object on
-standard output, with status text on standard error. Scripts can then read
-`id`, `amount`, `shortfall_wei`, `expires_at` (Unix milliseconds) and the fee
-fields without parsing text. If no new quote is prepared, for example because
-a signed withdrawal is already saved, the command exits nonzero and prints
-nothing on standard output.
+Add `--json` to a quote to print it as one JSON object on standard output,
+with status text on standard error. If no new quote is prepared, for example
+because a signed withdrawal is already saved, the command exits nonzero and
+prints nothing on standard output. Amounts are decimal strings in wei.
+
+| Key | Value |
+| --- | --- |
+| `id` | Quote ID to pass to `--approve` |
+| `kind` | `fund`, `withdraw` or `return` |
+| `network` | `mainnet` or `sepolia` |
+| `address` | Local signing address that pays fees (and the deposit) |
+| `destination` | Recipient; `withdraw` and `return` only |
+| `amount_wei` | Fixed deposit principal, withdrawn private balance, or returned amount |
+| `max_fee_wei` | Maximum network fee approved with the quote |
+| `required_total_wei` | Public ETH the signing address needs for this quote |
+| `shortfall_wei` | ETH still missing on the signing address; `"0"` when funded |
+| `expires_at` | Expiry as a Unix time in milliseconds |
 
 The wallet holds one note, and a note cannot be topped up. To add funds after
 a deposit, withdraw the note (for example to an address you control), then fund
