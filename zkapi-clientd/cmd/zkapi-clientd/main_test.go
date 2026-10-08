@@ -71,6 +71,32 @@ func TestWalletCommandsUseSavedConfigurationAndRunningDaemon(t *testing.T) {
 	}
 }
 
+func TestWalletCommandHelpWinsOverFlagValues(t *testing.T) {
+	c, err := config.Default()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Listen = "127.0.0.1:1"
+	saved := filepath.Join(t.TempDir(), "saved")
+	if err := config.Init(saved, c); err != nil {
+		t.Fatal(err)
+	}
+	missing := filepath.Join(t.TempDir(), "missing")
+	for _, args := range [][]string{
+		{"fund", "--approve", "--help"},
+		{"fund", "--usd", "-h", "--json"},
+		{"fund", "return", "--approve", "--help"},
+		{"withdraw", "--approve", "-h"},
+		{"withdraw", "--to", "--help"},
+	} {
+		for _, dir := range []string{saved, missing} {
+			if err := run(append([]string{"--config-dir", dir}, args...)); err != nil {
+				t.Fatalf("%v ran instead of printing help: %v", args, err)
+			}
+		}
+	}
+}
+
 type inferenceTestTransport func(*http.Request) (*http.Response, error)
 
 func (f inferenceTestTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }

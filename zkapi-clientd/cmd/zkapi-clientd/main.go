@@ -112,7 +112,15 @@ func run(args []string) error {
 // Quoting never signs; only --approve with the exact displayed quote ID spends.
 func runWalletCommand(dir, command string, args []string, out io.Writer) error {
 	c, err := config.Load(dir)
-	if err != nil && !helpRequested(args) {
+	if helpRequested(args) {
+		// Help wins even where the flag parser would read it as a value
+		// (fund --approve --help), so it never runs the command.
+		help := []string{"--help"}
+		if command == "fund" && len(args) > 0 && args[0] == "return" {
+			help = []string{"return", "--help"}
+		}
+		args = help
+	} else if err != nil {
 		return configurationRequired(err)
 	}
 	// Help needs no configuration: flag parsing returns before any request.
