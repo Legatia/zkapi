@@ -42,7 +42,7 @@ func runConfiguredServe(ctx context.Context, dir string, c, expected config.Conf
 	if allowUnfunded {
 		runtime.fund = checkServeZKAPI
 	}
-	err := guidedStart(ctx, dir, startOptions{prepared: &c, checkOnly: true}, ui, out, runtime)
+	err := guidedStart(ctx, dir, startOptions{prepared: &c, checkOnly: true, allowUnfunded: allowUnfunded}, ui, out, runtime)
 	if ctx.Err() != nil {
 		return nil
 	}

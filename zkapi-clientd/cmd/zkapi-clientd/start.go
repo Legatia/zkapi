@@ -218,6 +218,7 @@ type startOptions struct {
 	network, usd, model, listen        string
 	prepared                           *config.Config
 	setupOnly, checkOnly, quietStartup bool
+	allowUnfunded                      bool // serve --allow-unfunded; only changes the resume hint here
 }
 
 func parseStartOptions(args []string) (startOptions, error) {
@@ -501,7 +502,11 @@ func guidedStart(ctx context.Context, dir string, options startOptions, ui setup
 		ui.Printf("The existing daemon continues running.\n")
 		return nil
 	}
-	ui.Printf("Leave this terminal running. Ctrl+C stops the daemon; run zkapi-clientd serve to resume.\n")
+	resume := "zkapi-clientd serve"
+	if options.allowUnfunded {
+		resume += " --allow-unfunded"
+	}
+	ui.Printf("Leave this terminal running. Ctrl+C stops the daemon; run %s to resume.\n", resume)
 	logs.enable()
 	result = <-done
 	done = nil

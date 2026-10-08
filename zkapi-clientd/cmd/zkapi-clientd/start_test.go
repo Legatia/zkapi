@@ -524,7 +524,7 @@ func TestUnfundedServeKeepsRunningWithoutReportingReady(t *testing.T) {
 		interval:  time.Millisecond, timeout: time.Second,
 	}
 	result := make(chan error, 1)
-	go func() { result <- guidedStart(ctx, dir, startOptions{}, ui, io.Discard, runtime) }()
+	go func() { result <- guidedStart(ctx, dir, startOptions{allowUnfunded: true}, ui, io.Discard, runtime) }()
 	deadline := time.After(2 * time.Second)
 	for {
 		ui.mu.Lock()
@@ -533,6 +533,9 @@ func TestUnfundedServeKeepsRunningWithoutReportingReady(t *testing.T) {
 		if strings.Contains(text, "Leave this terminal running") {
 			if !strings.Contains(text, "Local API running; inference is unavailable until the wallet can spend.") || strings.Contains(text, "Ready for inference") {
 				t.Fatalf("unfunded serve reported readiness: %s", text)
+			}
+			if !strings.Contains(text, "run zkapi-clientd serve --allow-unfunded to resume") {
+				t.Fatalf("resume hint drops --allow-unfunded: %s", text)
 			}
 			break
 		}
