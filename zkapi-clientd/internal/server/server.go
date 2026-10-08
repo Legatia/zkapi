@@ -134,7 +134,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case mediaPath(r.URL.Path):
 		a.media(w, r)
 	default:
-		writeError(w, 404, "not_found", "Use /v1/models or /v1/chat/completions.")
+		writeError(w, 404, "not_found", "Use /v1/models, /v1/chat/completions, /v1/embeddings or /v1/videos.")
 	}
 }
 

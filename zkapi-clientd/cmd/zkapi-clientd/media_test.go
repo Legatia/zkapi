@@ -18,7 +18,6 @@ func TestMediaErrorsMapToSafeActionableResponses(t *testing.T) {
 	}{
 		{&zkapi.Error{Status: http.StatusPaymentRequired, Code: "companion_request_failed"}, 402, "funding_required"},
 		{&zkapi.Error{Status: http.StatusBadRequest, Code: "model_not_enabled"}, 400, "model_not_enabled"},
-		{&zkapi.Error{Status: http.StatusBadRequest, Code: "invalid_model"}, 400, "invalid_model"},
 		{&zkapi.Error{Status: http.StatusBadGateway, Code: "model_policy_unavailable"}, 502, "model_policy_unavailable"},
 		{&zkapi.Error{Status: http.StatusConflict, Code: "withdrawal_pending"}, 409, "withdrawal_pending"},
 		{&zkapi.Error{Status: http.StatusConflict, Code: "lease_already_used"}, 409, "wallet_conflict"},
@@ -32,6 +31,11 @@ func TestMediaErrorsMapToSafeActionableResponses(t *testing.T) {
 		if err := mediaError(test.err); !errors.As(err, &safe) || safe.Status != test.status || safe.Code != test.code || strings.Contains(safe.Message, "zkAPI ") {
 			t.Fatalf("%s mapped to %v", test.err.Code, err)
 		}
+	}
+	var invalid *server.BackendError
+	if !errors.As(mediaError(&zkapi.Error{Status: http.StatusBadRequest, Code: "invalid_model"}), &invalid) ||
+		invalid.Code != "invalid_model" || !strings.Contains(invalid.Message, "/v1/embeddings/models") || strings.Contains(invalid.Message, "Select a model from /v1/models") {
+		t.Fatalf("invalid_model on a media route: %v", invalid)
 	}
 	if mediaError(nil) != nil {
 		t.Fatal("success mapped to an error")

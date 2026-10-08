@@ -50,6 +50,8 @@ func mediaError(err error) error {
 		return err
 	}
 	switch remote.Code {
+	case "invalid_model":
+		return &server.BackendError{Status: 400, Code: "invalid_model", Message: "Select a model from /v1/embeddings/models or /v1/videos/models."}
 	case "model_not_enabled":
 		return &server.BackendError{Status: 400, Code: "model_not_enabled", Message: "The issuer's model policy does not enable this model for this endpoint. GET /v1/embeddings/models or /v1/videos/models lists enabled models."}
 	case "models_unavailable":
