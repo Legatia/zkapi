@@ -56,6 +56,9 @@ zkapi-clientd config --api-key          # show that key when requested
 zkapi-clientd config --key-reuse-window-seconds 0  # fresh key per inference request
 ```
 
+To fund from a script instead, see
+[scripted funding and withdrawal](#scripted-funding-and-withdrawal).
+
 Use the arrow keys (or `j`/`k`) and Enter to select wallet actions and networks.
 Esc or `q` cancels a selection. Text prompts remain available when output is
 redirected. Ctrl+C stops safely and preserves saved progress; run
@@ -119,7 +122,7 @@ prints nothing on standard output. Amounts are decimal strings in wei.
 | `destination` | Recipient; `withdraw` and `return` only |
 | `amount_wei` | Fixed deposit principal, withdrawn private balance, or returned amount |
 | `max_fee_wei` | Maximum network fee approved with the quote |
-| `required_total_wei` | Public ETH the signing address needs for this quote |
+| `required_total_wei` | Public ETH the signing address needs for this quote: the deposit or returned amount (none for `withdraw`) plus the required network fee, which can be lower than `max_fee_wei` |
 | `shortfall_wei` | ETH still missing on the signing address; `"0"` when funded |
 | `expires_at` | Expiry as a Unix time in milliseconds |
 
@@ -220,6 +223,9 @@ Returning `all` requires an ordinary Ethereum account with no deployed code.
 For a delegated or contract recipient, choose an exact ETH amount and leave
 room for the displayed maximum fee. The exact-amount path still simulates the
 transfer and requires destination, amount and fee approval.
+
+`zkapi-clientd withdraw` and `zkapi-clientd fund return` do the same from a
+script; see [scripted funding and withdrawal](#scripted-funding-and-withdrawal).
 
 ## Inference and activity
 

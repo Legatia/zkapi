@@ -59,8 +59,8 @@ A configured service also exits while the wallet cannot spend (no deposit yet,
 an empty balance, or a reserved withdrawal); fund it first with
 `zkapi-clientd config`. To start the service unfunded and fund it later with
 [`zkapi-clientd fund`](CLI_ZKAPI.md#scripted-funding-and-withdrawal), run
-`serve --allow-unfunded` instead. For a systemd user service (AUR or Home
-Manager), add a drop-in with `systemctl --user edit zkapi-clientd`:
+`serve --allow-unfunded` instead. For the AUR package's systemd user service,
+add a drop-in with `systemctl --user edit zkapi-clientd`:
 
 ```ini
 [Service]
@@ -68,10 +68,10 @@ ExecStart=
 ExecStart=/usr/bin/zkapi-clientd serve --allow-unfunded
 ```
 
-Use the package's own binary path (for Nix, override the module's
-`ExecStart`). `brew services` always runs plain `serve`; on macOS, use your own
-launchd agent whose `ProgramArguments` are `zkapi-clientd`, `serve` and
-`--allow-unfunded`.
+Use the package's own binary path. For NixOS or Home Manager, override the
+module's `ExecStart` instead. `brew services` always runs plain `serve`; on
+macOS, use your own launchd agent whose `ProgramArguments` are
+`zkapi-clientd`, `serve` and `--allow-unfunded`.
 
 The AUR handoff and Homebrew formula are ready to copy into their respective
 package repositories; adding them here does not publish an AUR entry or a public
