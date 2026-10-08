@@ -237,10 +237,12 @@ fallback allowance. Requests and responses use OpenRouter's shapes. `user`,
 
 Embeddings follow the chat rules above, including key reuse. A video job
 takes a fresh key and holds it, and the wallet's single lease, until the job
-fails, all of its outputs have been downloaded, it is deleted, or the key's
-usable lifetime ends (`oa_lease_expires_at`; about four and a half minutes
-for a five-minute lease). Chat and embeddings requests wait meanwhile, and a
-second video job returns `409 video_job_active`. Settlement then retires the
+fails or is cancelled or expired upstream, all of its outputs have been
+downloaded, it is deleted, or the key's usable lifetime ends
+(`oa_lease_expires_at`; about four and a half minutes for a five-minute
+lease). Chat and embeddings requests wait meanwhile. A video submission made
+while another job is active or still being submitted returns
+`409 video_job_active`. Settlement then retires the
 key as usual. Download the content before the key expires; afterwards the
 job reports `410 video_content_expired`, or status `expired` if it had not
 finished. A job that outlives its key may still be charged by the provider.

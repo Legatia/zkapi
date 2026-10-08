@@ -559,6 +559,52 @@ func TestOnlyOneVideoJobHoldsTheLeaseAndDeleteNeedsAFinishedJob(t *testing.T) {
 	})
 }
 
+func TestConcurrentVideoSubmissionsStartOneJob(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		f := newMediaFixture(t, time.Minute)
+		cancel, _ := startAutomaticSettlement(t, f.client)
+		defer cancel()
+		// Another request owns the slot, so both submissions arrive while it
+		// is busy and neither has a job yet.
+		f.client.requestSlot <- struct{}{}
+		results := make(chan error, 2)
+		for range 2 {
+			go func() {
+				response, err := f.client.SubmitVideo(context.Background(), videoBody())
+				if err == nil {
+					response.Body.Close()
+				}
+				results <- err
+			}()
+		}
+		synctest.Wait()
+		<-f.client.requestSlot
+		synctest.Wait()
+		var started, refused int
+		for range 2 {
+			select {
+			case err := <-results:
+				switch {
+				case err == nil:
+					started++
+				case errorCode(err) == "video_job_active":
+					refused++
+				default:
+					t.Fatalf("submission: %v", err)
+				}
+			default:
+				t.Fatal("a submission is still waiting behind the first job")
+			}
+		}
+		if started != 1 || refused != 1 {
+			t.Fatalf("started=%d refused=%d", started, refused)
+		}
+		if calls := f.providerCalls("POST provider.invalid/api/v1/videos"); len(calls) != 1 {
+			t.Fatalf("provider submissions %v", calls)
+		}
+	})
+}
+
 func TestVideoJobTakesAFreshKeyNotTheReusableChatKey(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		f := newMediaFixture(t, time.Minute)

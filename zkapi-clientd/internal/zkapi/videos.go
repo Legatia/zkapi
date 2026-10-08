@@ -21,9 +21,10 @@ import (
 
 // Video generation is asynchronous at OpenRouter: polling and downloading need
 // the key that submitted the job. A video job therefore owns the wallet's
-// single lease (requestSlot) from submission until the job fails, its outputs
-// have been downloaded, it is deleted locally, or the key's usable lifetime
-// ends. Other requests wait for it, as they wait for a streaming response.
+// single lease (requestSlot) from submission until the job fails, is cancelled
+// or expires upstream, its outputs have been downloaded, it is deleted
+// locally, or the key's usable lifetime ends. Other requests wait for it, as
+// they wait for a streaming response.
 // Job state is in memory only and contains no prompt; after a restart the
 // wallet companion's lease recovery settles the key as usual.
 const (
@@ -290,13 +291,21 @@ func (c *Client) videoJob(id string) (*videoJob, error) {
 // SubmitVideo starts one provider video job under a fresh lease and returns
 // its local description (202). The submission is never retried.
 func (c *Client) SubmitVideo(ctx context.Context, body json.RawMessage) (*http.Response, error) {
+	// One submission at a time: a second one waiting for the slot would
+	// otherwise start its own job as soon as the first job is released.
 	c.videoMu.Lock()
 	c.pruneVideoJobsLocked()
-	busy := c.activeVideo != nil
+	busy := c.activeVideo != nil || c.videoSubmit
+	c.videoSubmit = !busy
 	c.videoMu.Unlock()
 	if busy {
 		return nil, &Error{http.StatusConflict, "video_job_active"}
 	}
+	defer func() {
+		c.videoMu.Lock()
+		c.videoSubmit = false
+		c.videoMu.Unlock()
+	}()
 	var model struct {
 		Model string `json:"model"`
 	}

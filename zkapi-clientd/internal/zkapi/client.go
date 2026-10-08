@@ -56,6 +56,7 @@ type Client struct {
 	videoMu        sync.Mutex
 	videoJobs      map[string]*videoJob
 	activeVideo    *videoJob // owns requestSlot until released
+	videoSubmit    bool      // a submission is in progress; guarded by videoMu
 }
 
 // Error is safe to return to API consumers: raw companion/provider messages
